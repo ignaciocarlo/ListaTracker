@@ -1,41 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Mvc;
 using ListaTracker.Data;
-using ListaTracker.Entities;
 using ListaTracker.Models;
 using AutoMapper;
 using Microsoft.IdentityModel.Tokens;
+using MediatR;
+using ListaTracker.Features.Categories.Queries;
+using ListaTracker.Features.Categories.Commands;
 
 namespace ListaTracker.Controllers
 {
     public class CategoriesController : Controller
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IMediator _mediator;
         private readonly IMapper _mapper;
 
-        public CategoriesController(ApplicationDbContext context,
+        public CategoriesController(IMediator mediator,
             IMapper mapper)
         {
-            _context = context;
+            _mediator = mediator;
             _mapper = mapper;
         }
 
         // GET: Categories
         public async Task<IActionResult> Index()
         {
-            var categories = await _context.Categories.ToListAsync();
-            var test = _mapper.Map<IEnumerable<CategoryViewModel>>(categories);
-            return View(test);
+            var categories = await _mediator.Send(new GetCategoriesQuery());
+            return View(_mapper.Map<IEnumerable<CategoryViewModel>>(categories));
         }
 
-        // GET: Categories/Create
+        // GET: Categories/CreateOrEdit
         [HttpGet]
-        public IActionResult CreateOrEdit(string? id)
+        public async Task<IActionResult> CreateOrEdit(string? id)
         {
             if (id.IsNullOrEmpty())
             {
@@ -43,8 +38,7 @@ namespace ListaTracker.Controllers
             }
             else
             {
-                CategoryViewModel category = _mapper.Map<CategoryViewModel>(_context.Categories.Find(id));
-                return View(category);
+                return View(_mapper.Map<CategoryViewModel>(await _mediator.Send(new GetCategoryByIdQuery() { Id = id })));
             }
         }
 
@@ -59,20 +53,13 @@ namespace ListaTracker.Controllers
             {
                 if (request.Id.IsNullOrEmpty())
                 {
-                    Category category = _mapper.Map<Category>(request);
-                    _context.Add(category);
-                    await _context.SaveChangesAsync();
+                    _ = await _mediator.Send(_mapper.Map<CreateCategoryCommand>(request));
                 }
                 else
                 {
-                    Category? category = _context.Categories.Find(request.Id);
-                    if(category != null)
-                    {
-                        category = _mapper.Map(request, category);
-                        _context.Update(category);
-                        await _context.SaveChangesAsync();
-                        return RedirectToAction(nameof(Index));
-                    }
+                    // Assume that it is always an Edit Action
+                    _ = await _mediator.Send(_mapper.Map<UpdateCategoryCommand>(request));
+                    return RedirectToAction(nameof(Index));
                 } 
             }
             return View(request);
@@ -83,13 +70,7 @@ namespace ListaTracker.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(string id)
         {
-            var category = await _context.Categories.FindAsync(id);
-            if (category != null)
-            {
-                _context.Categories.Remove(category);
-            }
-
-            await _context.SaveChangesAsync();
+            _ = await _mediator.Send(new DeleteCategoryCommand() { Id = id });
             return RedirectToAction(nameof(Index));
         }
 
