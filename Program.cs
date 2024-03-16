@@ -12,6 +12,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+});
+
 // Register Syncfusion
 Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("YOUR SYNCFUSION LICENSE KEY");
 
